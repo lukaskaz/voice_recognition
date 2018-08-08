@@ -23,61 +23,7 @@ void signal_handler(int sig)
 	exit(0);
 }
 
-static int get_user(easyvr& vr)
-{
-    int user = (-1);
-    int retry_question = 3;
 
-    vr.set_timeout(10);
-    vr.set_sd_sensitive(3);
-
-    vr.play_voice_info(2);
-    while(1) {
-        user = vr.recognize_user();
-        if(user >= 0) {
-            break;
-        }
-
-        if(retry_question) {
-            retry_question--;
-            vr.play_voice_info(7);
-        }
-        else {
-            vr.play_voice_info(10);
-            break;
-        }
-    }
-
-    return user;
-}
-
-static int get_password(easyvr& vr)
-{
-    int pass = (-1);
-    int retry_question = 3;
-
-    vr.set_timeout(10);
-    vr.set_sd_sensitive(3);
-
-    vr.play_voice_info(4);
-    while(1) {
-        pass = vr.recognize_password();
-        if(pass >= 0) {
-            break;
-        }
-
-        if(retry_question) {
-            retry_question--;
-            vr.play_voice_info(8);
-        }
-        else {
-            vr.play_voice_info(10);
-            break;
-        }
-    }
-
-    return pass;
-}
 
 static void get_user_name(int user, std::string& name)
 {
@@ -100,23 +46,20 @@ static void get_user_name(int user, std::string& name)
     }
 }
 
-static int process_authentication(easyvr& vr, int user, int pass)
+static int auth_user_process(int user)
 {
-    int access = 0;
+    std::string user_name;
+    
+    get_user_name(user, user_name);
+    std::string py_script("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u " + user_name + " >/dev/null &");
 
-    if(user == pass) {
-        vr.play_voice_info(6);
+    //std::cerr<<py_script.c_str()<<std::endl;
+    //system("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u lukasz &>/dev/null &");
+    system(py_script.c_str());
+    sleep(1);
+    int ret = system("ps aux|grep -i led_text.py | grep -iv grep >/dev/null");
 
-        std::string user_name;
-        
-        get_user_name(user, user_name);
-        std::string py_script("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u " + user_name + " >/dev/null &");
-
-        //std::cerr<<py_script.c_str()<<std::endl;
-        //system("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u lukasz &>/dev/null &");
-        system(py_script.c_str());
-        
-
+    if(ret == 0) {
         int delay = 15;
         std::cerr<<"Demo login duration left: "<<delay<<" s ";
         while(1) {
@@ -132,114 +75,43 @@ static int process_authentication(easyvr& vr, int user, int pass)
                 }
             }
             else {
-                vr.increment_session();
                 std::cerr<<"\b\b\b\b"<<delay<< " s "<<std::endl;;
-                std::cerr<<"Completed session number: "<<vr.get_session()<<" !!"<<std::endl;
+                std::cerr<<"Completed session number: "<</*vr.get_session()*/5<<" !!"<<std::endl;
                 break;
             }
         }
 
         system("pkill -2 -f led_text.py");
-        access = 1;
-    }
-    else {
-        vr.play_voice_info(9);
-    }
-
-    return access;
-}   
-
-static void greet_user(easyvr& vr, int user)
-{
-    int user_name_record = (-1);
-
-    vr.play_voice_info(3);
-    switch(user) {
-        case 0:
-            user_name_record = 11;
-            break;
-        case 1:
-            user_name_record = 12;
-            break;
-        case 2:
-            user_name_record = 13;
-            break;
-        case 3:
-            user_name_record = 14;
-            break;
-        default:
-            break;
-    }
-
-    if(user_name_record >= 0) {
-        vr.play_voice_info(user_name_record);
-    }
-}
-
-static int process_system_commands(easyvr& vr)
-{
-    int ret = 0;
-
-    vr.set_timeout(5);
-    vr.set_sd_sensitive(5);
-
-    vr.play_voice_info(0);
-    int exit_cmd = vr.recognize_exit();
-    if(exit_cmd == 0) {
-            std::cerr<<"Closing VR application!!"<<std::endl;
-            ret = 1;
-    }
-    else if(exit_cmd == 1) {
-            std::cerr<<"RPI system shutdown!!"<<std::endl;
-            vr.~easyvr();
-            sleep(2);
-            system("halt -p");
-    }
-    else if(exit_cmd == 2){
-        std::cerr<<"No exit command received, continuing!!"<<std::endl;
-    }
-    else {
-        std::cerr<<"No command given, continuing!!"<<std::endl;
     }
 
     return ret;
 }
 
-static void wait_for_trigger(easyvr& vr)
-{
-    vr.set_timeout(0);
-    vr.set_sd_sensitive(5);
 
-    while(1) {
-        std::cout<<std::endl<<"START >> Listening for trigger word to activate!!"<<std::endl;
-        if(vr.recognize_trigger() == 0) {
-            break;
-        }
-    }
-}
+
+
 
 int main(int argc, char* argv[])
 {
     signal(SIGINT, signal_handler);
     std::cout<<"Starting EasyVR control program!"<<std::endl;
 
-    easyvr vr;
+    easyvr vr(auth_user_process);
 
     std::cout<<"EasyVR FW version is: "<<vr.get_fw_version()<<std::endl;
-    vr.set_baudrate(1);
+    vr.set_baudrate(3);
 
     while(1) {
-        wait_for_trigger(vr);
+        vr.wait_for_trigger();
 
-        vr.play_voice_info(1);
-        int user = get_user(vr);
-        if(user >= 0) {
-            greet_user(vr, user);
-            
-            int pass = get_password(vr);
-            if(process_authentication(vr, user, pass) == 1) {
-                if(process_system_commands(vr) == 1) {
-                    break;
+        if(!vr.get_user()) {
+            vr.greet_user();
+
+            if(!vr.get_password()) {
+                if(!vr.process_authentication()) {
+                    if(vr.process_system_commands() == 1) {
+                        break;
+                    }
                 }
             }
         }

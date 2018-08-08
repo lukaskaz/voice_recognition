@@ -31,8 +31,8 @@ void easyvr::adjust_baudrate(void)
 		baudrate = B9600;
 	}
 	else {
-		std::cerr<<"Switching baudrate to 115200bd"<<std::endl;
-		baudrate = B115200;
+		std::cerr<<"Switching baudrate to 38400bd"<<std::endl;
+		baudrate = B38400;
 	}
 }
 
@@ -79,8 +79,14 @@ void easyvr::set_baudrate(int baud_id)
 		case 1:
 			tmp = B115200;
 			break;
+		case 2:
+			tmp = B57600;
+			break;
+		case 3:
+			tmp = B38400;
+			break;
 		default:
-			break;	
+			break;
 	}
 
 	baudrate = tmp;
@@ -211,8 +217,10 @@ void easyvr::play_voice_info(int type)
 int easyvr::get_fw_version(void)
 {
 	int version = (-1);
+    char resp = '\0';
 
-	if(transfer_data('x') == 'x') {
+    resp = transfer_data('x');
+	if(resp == 'x') {
 		char tmp = '\0';
 
 		tmp = get_argument();
@@ -220,6 +228,7 @@ int easyvr::get_fw_version(void)
 			version = (int)tmp;	
 		}
 	}
+    //std::cerr<<"Resp: "<<resp<<std::endl;
 
 	return version;
 }
@@ -235,6 +244,155 @@ char easyvr::get_argument(void)
 
 	return data;
 }
+
+void easyvr::wait_for_trigger(void)
+{
+    set_timeout(0);
+    set_sd_sensitive(5);
+
+    while(1) {
+        std::cout<<std::endl<<"START >> Listening for trigger word to activate!!"<<std::endl;
+        if(recognize_trigger() == 0) {
+            play_voice_info(1);
+            break;
+        }
+    }
+}
+
+int easyvr::get_user(void)
+{
+    int ret = (-1);
+    int retry_question = 3;
+
+    set_timeout(10);
+    set_sd_sensitive(3);
+
+    play_voice_info(2);
+    while(1) {
+        user_idx = recognize_user();
+        if(user_idx >= 0) {
+            ret = 0;
+            break;
+        }
+
+        if(retry_question--) {
+            play_voice_info(7);
+        }
+        else {
+            play_voice_info(10);
+            break;
+        }
+    }
+
+    return ret;
+}
+
+void easyvr::greet_user(void)
+{
+    int user_name_record = (-1);
+
+    play_voice_info(3);
+    switch(user_idx) {
+        case 0:
+            user_name_record = 11;
+            break;
+        case 1:
+            user_name_record = 12;
+            break;
+        case 2:
+            user_name_record = 13;
+            break;
+        case 3:
+            user_name_record = 14;
+            break;
+        default:
+            break;
+    }
+
+    if(user_name_record >= 0) {
+        play_voice_info(user_name_record);
+    }
+}
+
+int easyvr::get_password(void)
+{
+    int ret = (-1);
+    int retry_question = 3;
+
+    set_timeout(10);
+    set_sd_sensitive(3);
+
+    play_voice_info(4);
+    while(1) {
+        pass_idx = recognize_password();
+        if(pass_idx >= 0) {
+            ret = 0;
+            break;
+        }
+
+        if(retry_question--) {
+            play_voice_info(8);
+        }
+        else {
+            play_voice_info(10);
+            break;
+        }
+    }
+
+    return ret;
+}
+
+int easyvr::process_authentication(void)
+{
+    int ret = (-1);
+
+    if(user_idx == pass_idx) {
+        play_voice_info(6);
+        
+        increment_session();
+        user_fn(user_idx);
+
+        ret = 0;
+    }
+    else {
+        play_voice_info(9);
+    }
+
+    return ret;
+} 
+
+int easyvr::process_system_commands(void)
+{
+    int ret = (-1);
+
+    set_timeout(5);
+    set_sd_sensitive(5);
+
+    play_voice_info(0);
+    int exit_cmd = recognize_exit();
+    if(exit_cmd == 0) {
+            std::cerr<<"Closing VR application!!"<<std::endl;
+            ret = 1;
+    }
+    else if(exit_cmd == 1) {
+            std::cerr<<"RPI system shutdown!!"<<std::endl;
+            set_baudrate(12);
+
+            sleep(2);
+            system("halt -p");
+            ret = 1;
+    }
+    else if(exit_cmd == 2){
+        std::cerr<<"Command to keep going received, continuing!!"<<std::endl;
+        ret = 0;
+    }
+    else {
+        std::cerr<<"No command given, continuing!!"<<std::endl;
+        ret = 0;
+    }
+
+    return ret;
+} 
 
 char easyvr::transfer_data(char req)
 {
@@ -284,7 +442,7 @@ char easyvr::transfer_data(char req)
 	return resp;
 }
 
-char easyvr::transfer_sequence(char* req, size_t size)
+char easyvr::transfer_sequence(char* req, ssize_t size)
 {
 	char resp = '\0';
 
@@ -301,15 +459,7 @@ char easyvr::transfer_sequence(char* req, size_t size)
 		tcsetattr(fd, TCSANOW, &options);	
 
 		while(1) {
-		//	if(write(fd, req, size) == size) {
-			if(1) {
-				for(unsigned int i=0; i<size; i++) {
-					usleep(100);
-					if(write(fd, &req[i], 1) != 1) {
-						return resp;
-					}
-				}
-
+			if(write(fd, req, size) == size) {
 				int timoutMs = (-1);
 				struct pollfd pollInfo = { .fd = fd, .events = POLLIN, .revents = 0 };
 				int ret = poll(&pollInfo, 1, timoutMs);
