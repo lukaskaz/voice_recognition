@@ -9,36 +9,35 @@
 #include <fcntl.h>
 #include <termios.h> 
 
+#define SERIAL_NODE_NAME    "/dev/serial0"
+
 class easyvr {
     public:
-        easyvr(int (*fn)(int)): easyvr() { user_fn = fn; }
-        easyvr(): user_idx(-1), pass_idx(-1), user_fn(NULL), error(0), serial("/dev/serial0") { initialize(); };
+        easyvr(): baudrate(B9600), auth_sess_nb(0), non_auth_sess_nb(0), user_idx(-1), 
+                    pass_idx(-1), error(0), serial(SERIAL_NODE_NAME) { initialize(); };
         ~easyvr() { std::cerr<<"Destroying VR class!!"<<std::endl; set_baudrate(12); };
 
-        void set_timeout(int timeout);
-        void set_sd_sensitive(int level);
-        void set_baudrate(int baud_id);
-        int get_fw_version(void);
-        void play_voice_info(int type);
+        int get_fw_version(int& ver);
+        int authenticate(void);
+        int handle_commands();
 
-        void wait_for_trigger(void);
-        int get_user(void);
-        void greet_user(void);
-        int get_password(void);
-        int process_authentication(void);
-        int process_system_commands(void);
-
-        void increment_session(void) { session_nb++; }
-        int get_session(void) const { return session_nb; }
+        void incr_auth_session(void) { auth_sess_nb++; }
+        void incr_nonauth_session(void) { non_auth_sess_nb++; }
+        
+        int get_user_idx(void) const { return user_idx; }
+        int get_auth_session(void) const { return auth_sess_nb; }
+        int get_nonauth_session(void) const { return non_auth_sess_nb; }
+        int get_selected_cmd(void) const { return selected_cmd; }
 
     private:
-        static int baudrate;
-        static int session_nb;
+        int baudrate;
+        int auth_sess_nb;
+        int non_auth_sess_nb;
 
         int user_idx;
         int pass_idx;
-        int (*user_fn)(int);
-
+        int selected_cmd;
+        
         int error;
         std::string serial;
         
@@ -50,12 +49,22 @@ class easyvr {
         char get_argument(void);
         void error_handler(char resp);
 
+        int get_baudrate(int baud_id);
+        void set_baudrate(int baud_id);
         void adjust_baudrate(void);
+        void set_timeout(int timeout);
+        void set_sd_sensitive(int level);
+
         int recognize_trigger(void);
         int recognize_user(void);
         int recognize_password(void);
         int recognize_exit(void);
+        void play_voice_info(int type);
+
+        void wait_for_trigger(void);
+        int get_user(void);
+        void greet_user(void);
+        int get_password(void);
 };
 
 #endif
-
