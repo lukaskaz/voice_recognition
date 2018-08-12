@@ -6,30 +6,68 @@
 #include <fcntl.h>
 #include <termios.h> 
 
+#include "protocol.hpp"
 #include "vr.hpp"
 
-void easyvr::initialize_terminal(void)
-{
-    std::string init_serial_tty("stty clocal -F " + serial);
+static const int INFINITE_WAIT = (-1);
+static const int STANDARD_TIMEOUT_MS = 100;
 
-    std::cerr<<"Init: "<<init_serial_tty<<std::endl;
-    system(init_serial_tty.c_str());
+const bool easyvr::PRINT_INFO_TRACES  = true;
+const bool easyvr::PRINT_DEBUG_TRACES = true;
+const bool easyvr::PRINT_ERROR_TRACES = true;
+
+void easyvr::print_info(const std::string& source, const std::string& txt)
+{
+    if(PRINT_INFO_TRACES == true) {
+        std::cerr<<"[INFO]["<<source<<"] "<<txt<<std::endl;
+    }
 }
 
-void easyvr::adjust_baudrate(void)
+void easyvr::print_debug(const std::string& source, const std::string& txt)
+{
+    if(PRINT_DEBUG_TRACES == true) {
+        std::cerr<<"[DEBUG]["<<source<<"] "<<txt<<std::endl;
+    }
+}
+
+void easyvr::print_error(const std::string& source, const std::string& txt, int error_code = 0)
+{
+    if(PRINT_ERROR_TRACES == true) {
+        if(error_code) {
+            std::cerr<<"[ERROR]["<<source<<"] "<<txt<<", code: " \
+                <<std::showbase<<std::hex<<error_code<<std::dec<<std::endl;
+        }
+        else {
+            std::cerr<<"[ERROR]["<<source<<"] "<<txt<<std::endl;
+        }
+    }
+}
+
+void easyvr::initialize_serial(void)
+{
+    std::string init_serial_cmd("stty clocal -F " + serial);
+
+    print_debug(__func__, init_serial_cmd);
+    system(init_serial_cmd.c_str());
+}
+
+void easyvr::initialize_baudrate(void)
 {
     char resp = '\0';
+    static const int alt_baudrate = bd38400;
 
-    resp = transfer_data('x');
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    resp = transfer_data(CMD_ID, STANDARD_TIMEOUT_MS);
+    print_debug(__func__, std::string("Resp: ") + resp);
 
-    if(resp == 'x' || resp == 'w') {
-        std::cerr<<"Default baudrate is set (9600bd), changing to alternative baud!"<<std::endl;
-        set_baudrate(3);
+    if(resp == STS_ID || resp == STS_AWAKEN) {
+        print_info(__func__, std::string("Default baudrate is set (9600bd), ") + \
+            "changing to alternative baud(" + std::to_string(alt_baudrate) + ")");
+        set_baudrate(alt_baudrate);
     }
     else {
-        std::cerr<<"Alternative baudrade is already set, updating env variables!"<<std::endl;
-        baudrate = get_baudrate(3);
+        print_info(__func__, std::string("Alternative baudrade is already set(") + \
+            std::to_string(alt_baudrate) + "), updating environment variables!");
+        baudrate = get_baudrate(alt_baudrate);
     }
 }
 
@@ -37,25 +75,31 @@ void easyvr::initialize_vr(void)
 {
     char resp = '\0';
 
-    while(resp != 'o' && resp != 'i') {
-        resp = transfer_data('b');
-    }
+    do {
+        resp = transfer_data(CMD_BREAK, STANDARD_TIMEOUT_MS);
+    } while(resp != STS_SUCCESS && resp != STS_INTERR);
 
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    print_debug(__func__, std::string("Resp: ") + resp);
+}
+
+void easyvr::relase_vr(void)
+{
+    print_debug(__func__, "VR is being released, so restoring default settings!");
+    set_baudrate(bddefault);
 }
 
 void easyvr::error_handler(char resp)
 {
-    int err_type = (-1);
+    int err_code = (-1);
 
-    if(resp == 'e') {
-        err_type = get_argument();
-        if(err_type) {
-            err_type <<= 4;
-            err_type |= get_argument();
+    if(resp == STS_ERROR) {
+        err_code = get_argument();
+        if(err_code) {
+            err_code <<= 4;
+            err_code |= get_argument();
         }
 
-        std::cerr<<"Error: "<<std::showbase<<std::hex<<err_type<<std::dec<<std::endl;
+        print_error(__func__, "Error detected", err_code);
     }
 
     initialize_vr();
@@ -93,57 +137,70 @@ void easyvr::set_baudrate(int baud_id)
     int tmp = get_baudrate(baud_id);
 
     if(tmp != baudrate) {
-        char req[2] = { 'a', 'A'};
+        const char req[] =
+        {
+            CMD_BAUDRATE,
+            (char)(ARG_ZERO + baud_id)
+        };
         char resp = '\0';
 
-        req[1] += baud_id;
-        resp = transfer_sequence(req, sizeof(req));
+        resp = transfer_sequence(req, sizeof(req), STANDARD_TIMEOUT_MS);
+        print_debug(__func__, std::string("Resp: ") + resp);
 
-        std::cerr<<"Resp: "<<resp<<std::endl;
         baudrate = tmp;
     }
 }
 
 void easyvr::set_timeout(int timeout)
 {
-    char req[2] = { 'o', 'A'};
+    const char req[] =
+    {
+        CMD_TIMEOUT,
+        (char)(ARG_ZERO + timeout)
+    };
     char resp = '\0';
 
-    req[1] += timeout;
-    resp = transfer_sequence(req, sizeof(req));
-
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    resp = transfer_sequence(req, sizeof(req), STANDARD_TIMEOUT_MS);
+    print_debug(__func__, std::string("Resp: ") + resp);
 }
 
 void easyvr::set_sd_sensitive(int level)
 {
-	char req[2] = { 'v', 'A'};
-	char resp = '\0';
+    char req[] =
+    {
+        CMD_LEVEL,
+        (char)(ARG_ZERO + level)
+    };
+    char resp = '\0';
 
-	req[1] += level;
-	resp = transfer_sequence(req, sizeof(req));
-
-	std::cerr<<"Resp: "<<resp<<std::endl;
+    resp = transfer_sequence(req, sizeof(req), STANDARD_TIMEOUT_MS);
+    print_debug(__func__, std::string("Resp: ")  + resp);
 }
 
 int easyvr::recognize_trigger(void)
 {
     int trig = (-1);
-    char req[2] = { 'd', 'A' };
+    static const int trigger_group = 0;
+    char req[] = 
+    {
+        CMD_RECOG_SD,
+        (char)(ARG_ZERO + trigger_group)
+    };
     char resp = '\0';
 
-    resp = transfer_sequence(req, sizeof(req));
+    req[1] += trigger_group;
+    resp = transfer_sequence(req, sizeof(req), INFINITE_WAIT);
 
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    print_debug(__func__, std::string("Resp: ")  + resp);
 
-    if(resp == 'r') {
+    if(resp == STS_RESULT) {
         trig = get_argument();
     }
     else {
         error_handler(resp);
     }
 
-    std::cerr<<"Trigger: "<<trig<<std::endl;
+    print_debug(__func__, "Trigger: " + std::to_string(trig));
 
     return trig;
 }
@@ -151,21 +208,25 @@ int easyvr::recognize_trigger(void)
 int easyvr::recognize_user(void)
 {
     int user = (-1);
-    char req[2] = { 'd', 'B' };
+    static const int users_group = 1;
+    static const char req[] =
+    {
+        CMD_RECOG_SD, 
+        (char)(ARG_ZERO + users_group)
+    };
     char resp = '\0';
 
-    resp = transfer_sequence(req, sizeof(req));
+    resp = transfer_sequence(req, sizeof(req), INFINITE_WAIT);
+    print_debug(__func__, std::string("Resp: ") + resp);
 
-    std::cerr<<"Resp: "<<resp<<std::endl;
-
-    if(resp == 'r') {
+    if(resp == STS_RESULT) {
         user = get_argument();
     }
     else {
         error_handler(resp);
     }
 
-    std::cerr<<"User: "<<user<<std::endl;
+    print_debug(__func__, "User: " + std::to_string(user));
 
     return user;
 }
@@ -173,21 +234,25 @@ int easyvr::recognize_user(void)
 int easyvr::recognize_password(void)
 {
     int pass = (-1);
-    char req[2] = { 'd', 'Q' };
+    static const int pass_group = 16;
+    static const char req[] =
+    {
+        CMD_RECOG_SD,
+        (char)(ARG_ZERO + pass_group)
+    };
     char resp = '\0';
 
-    resp = transfer_sequence(req, sizeof(req));
+    resp = transfer_sequence(req, sizeof(req), INFINITE_WAIT);
+    print_debug(__func__, std::string("Resp: ") + resp);
 
-    std::cerr<<"Resp: "<<resp<<std::endl;
-
-    if(resp == 'r') {
+    if(resp == STS_RESULT) {
         pass = get_argument();
     }
     else {
         error_handler(resp);
     }
 
-    std::cerr<<"Password: "<<pass<<std::endl;
+    print_debug(__func__, "Password: " + std::to_string(pass));
 
     return pass;
 }
@@ -195,34 +260,43 @@ int easyvr::recognize_password(void)
 int easyvr::recognize_exit(void)
 {
     int cmd = (-1);
-    char req[2] = { 'd', 'C' };
+    static const int exit_cmds_group = 2;
+    static const char req[] =
+    {
+        CMD_RECOG_SD,
+        (char)(ARG_ZERO + exit_cmds_group)
+    };
     char resp = '\0';
 
-    resp = transfer_sequence(req, sizeof(req));
+    resp = transfer_sequence(req, sizeof(req), INFINITE_WAIT);
+    print_debug(__func__, std::string("Resp: ") + resp);
 
-    std::cerr<<"Resp: "<<resp<<std::endl;
-
-    if(resp == 'r') {
+    if(resp == STS_RESULT) {
         cmd = get_argument();
     }
     else {
         error_handler(resp);
     }
 
-    std::cerr<<"Cmd: "<<cmd<<std::endl;
+    print_debug(__func__, "Command: " + std::to_string(cmd));
 
     return cmd;
 }
 
 void easyvr::play_voice_info(int type)
 {
-    char req[4] = { 'w', 'A', 'A', '`' };
+    static const int volume_gain = 31;
+    const char req[] =
+    {
+        CMD_PLAY_SX,
+        ARG_ZERO,
+        (char)(ARG_ZERO + type),
+        (char)(ARG_ZERO + volume_gain)
+    };
     char resp = '\0';
 
-    req[2] += type;
-    resp = transfer_sequence(req, sizeof(req));
-
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    resp = transfer_sequence(req, sizeof(req), INFINITE_WAIT);
+    print_debug(__func__, std::string("Resp: ") + resp);
 }
 
 int easyvr::get_fw_version(int& fw_ver)
@@ -230,8 +304,8 @@ int easyvr::get_fw_version(int& fw_ver)
     int ret = (-1);
     char resp = '\0';
 
-    resp = transfer_data('x');
-    if(resp == 'x') {
+    resp = transfer_data(CMD_ID, STANDARD_TIMEOUT_MS);
+    if(resp == STS_ID) {
         char tmp = '\0';
 
         tmp = get_argument();
@@ -240,7 +314,7 @@ int easyvr::get_fw_version(int& fw_ver)
             ret = 0;
         }
     }
-    std::cerr<<"Resp: "<<resp<<std::endl;
+    print_debug(__func__, std::string("Resp: ") + resp);
 
     return ret;
 }
@@ -249,9 +323,9 @@ char easyvr::get_argument(void)
 {
     int data = '\0', byte = '\0';
 
-    byte = transfer_data(' ');
+    byte = transfer_data(ARG_ACK, STANDARD_TIMEOUT_MS);
     if(byte != '\0') {
-        data = byte - 'A';
+        data = byte - ARG_ZERO;
     }
 
     return data;
@@ -263,7 +337,7 @@ void easyvr::wait_for_trigger(void)
     set_sd_sensitive(5);
 
     while(1) {
-        std::cout<<std::endl<<"START >> Listening for trigger word to activate!!"<<std::endl;
+        print_info(__func__, "START >> Listening for trigger word to activate!!");
         if(recognize_trigger() == 0) {
             break;
         }
@@ -365,8 +439,9 @@ int easyvr::authenticate(void)
 
         if(!get_password()) {
             if(user_idx == pass_idx) {
-                incr_auth_session();
-                std::cerr<<"Successfull access no.: "<<get_auth_session()<<" !!"<<std::endl;
+                auth_sess_nb++;
+                print_info(__func__, std::string("Successfull access no.: ") + \
+                                        std::to_string(auth_sess_nb) + " !!");
                 play_voice_info(6);
                 
                 ret = 0;
@@ -375,8 +450,9 @@ int easyvr::authenticate(void)
     }
 
     if(ret != 0) {
-        incr_nonauth_session();
-        std::cerr<<"Invalid access no.: "<<get_nonauth_session()<<std::endl;
+        non_auth_sess_nb++;
+        print_info(__func__, std::string("Invalid access no.: ") + \
+                                    std::to_string(non_auth_sess_nb));
         play_voice_info(9);
     }
 
@@ -396,79 +472,38 @@ int easyvr::handle_commands()
 
     selected_cmd = recognize_exit();
     if(selected_cmd == 0) {
-            std::cerr<<"Closing VR application!!"<<std::endl;
-            ret = 0;
+        print_info(__func__, "Closing VR application!!");
+        ret = 0;
     }
     else if(selected_cmd == 1) {
-            std::cerr<<"RPI system shutdown!!"<<std::endl;
-            set_baudrate(12);
+        print_info(__func__, "RPI system shutdown!!");
+        relase_vr();
 
-            sleep(2);
-            system("halt -p");
-            ret = 0;
+        sleep(2);
+        system("halt -p");
+        ret = 0;
     }
     else if(selected_cmd == 2){
-        std::cerr<<"Command to keep going received, continuing!!"<<std::endl;
+        print_info(__func__, "Command to keep going received, continuing!!");
         ret = 0;
     }
     else if(selected_cmd == 3){
-        std::cerr<<"Command to logout received, logging out!!"<<std::endl;
+        print_info(__func__, "Command to logout received, logging out!!");
         ret = 0;
     }
     else {
-        std::cerr<<"No command given, continuing!!"<<std::endl;
+        print_info(__func__, "No command given, continuing!!");
     }
 
     return ret;
 } 
 
-char easyvr::transfer_data(char req)
+char easyvr::transfer_data(const char req, int timeout_ms)
 {
-    char resp = '\0';
-
-    int fd = open(serial.c_str(), O_RDWR | O_NOCTTY );
-    if(fd >= 0) {
-        struct termios options;
-        tcgetattr(fd, &options);
-        options.c_cflag = baudrate | CS8 | CLOCAL | CREAD;		//<Set baud rate
-        options.c_iflag = IGNPAR;
-        options.c_oflag = 0;
-        options.c_lflag = 0;
-        tcflush(fd, TCIFLUSH);
-        tcsetattr(fd, TCSANOW, &options);
-
-        while(1) {
-            if(write(fd, &req, 1) == 1) {
-                int timoutMs = 500;
-                struct pollfd pollInfo = { .fd = fd, .events = POLLIN, .revents = 0 };
-                int ret = poll(&pollInfo, 1, timoutMs);
-
-                if(ret > 0 && (pollInfo.revents & POLLIN) != 0) {
-                    char byte = '\0';
-                
-                    if(read(fd, &byte, 1) == 1) {
-                        if(byte != 'v') {
-                            resp = byte;
-                            break;
-                        }
-
-                        std::cerr<<"Unrecognized data transfer, repeating..."<<std::endl;
-                        usleep(5000);
-                    }
-                }
-                else {
-                    break;
-                }
-            }
-        }
-
-        close(fd);
-    }
-
-    return resp;
+    return transfer_sequence(&req, 1, 100);
 }
 
-char easyvr::transfer_sequence(char* req, ssize_t size)
+char easyvr::transfer_sequence(const char* req, ssize_t size, int timeout_ms)
 {
     char resp = '\0';
 
@@ -476,7 +511,7 @@ char easyvr::transfer_sequence(char* req, ssize_t size)
     if(fd >= 0) {
         struct termios options;
         tcgetattr(fd, &options);
-        options.c_cflag = baudrate | CS8 | CLOCAL | CREAD;		//<Set baud rate
+        options.c_cflag = baudrate | CS8 | CLOCAL | CREAD;  //<Set baud rate
         options.c_iflag = IGNPAR;
         options.c_oflag = 0;
         options.c_lflag = 0;
@@ -485,22 +520,25 @@ char easyvr::transfer_sequence(char* req, ssize_t size)
 
         while(1) {
             if(write(fd, req, size) == size) {
-                int timoutMs = (-1);
                 struct pollfd pollInfo = { .fd = fd, .events = POLLIN, .revents = 0 };
-                int ret = poll(&pollInfo, 1, timoutMs);
+                int ret = poll(&pollInfo, 1, timeout_ms);
 
                 if(ret > 0 && (pollInfo.revents & POLLIN) != 0) {
                     char byte = '\0';
-                
+
                     if(read(fd, &byte, 1) == 1) {
-                        if(byte != 'v') {
+                        if(byte != STS_INVALID) {
                             resp = byte;
                             break;
                         }
 
-                        std::cerr<<"Unrecognized sequence transfer, repeating..."<<std::endl;
+                        print_error(__func__, "Unrecognized sequence transfer, repeating...");
                         usleep(5000);
                     }
+                }
+                else if(ret == 0) {
+                    print_error(__func__, "Timeout of request sending has occured");
+                    break;
                 }
             }
         }
