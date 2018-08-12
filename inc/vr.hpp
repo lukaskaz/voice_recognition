@@ -15,7 +15,7 @@ class easyvr {
     public:
         easyvr(): baudrate(B9600), auth_sess_nb(0), non_auth_sess_nb(0), user_idx(-1), 
                     pass_idx(-1), error(0), serial(SERIAL_NODE_NAME) { initialize(); };
-        ~easyvr() { relase_vr(); };
+        ~easyvr() { release_vr(); };
 
         int get_fw_version(int& ver);
         int authenticate(void);
@@ -45,7 +45,7 @@ class easyvr {
         void initialize_serial(void);
         void initialize_baudrate(void);
         void initialize_vr(void);
-        void relase_vr(void);
+        void release_vr(void);
 
         char transfer_sequence(const char* req, ssize_t size, int timeout_ms);
         char transfer_data(const char req, int timeout_ms);

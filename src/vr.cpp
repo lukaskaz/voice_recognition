@@ -82,7 +82,7 @@ void easyvr::initialize_vr(void)
     print_debug(__func__, std::string("Resp: ") + resp);
 }
 
-void easyvr::relase_vr(void)
+void easyvr::release_vr(void)
 {
     print_debug(__func__, "VR is being released, so restoring default settings!");
     set_baudrate(bddefault);
@@ -477,7 +477,7 @@ int easyvr::handle_commands()
     }
     else if(selected_cmd == 1) {
         print_info(__func__, "RPI system shutdown!!");
-        relase_vr();
+        release_vr();
 
         sleep(2);
         system("halt -p");
