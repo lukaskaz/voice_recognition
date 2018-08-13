@@ -11,28 +11,29 @@
 
 static const int INFINITE_WAIT = (-1);
 static const int STANDARD_TIMEOUT_MS = 100;
+static const int EXTENDED_TIMEOUT_MS = 500;
 
-const bool easyvr::PRINT_INFO_TRACES  = true;
-const bool easyvr::PRINT_DEBUG_TRACES = true;
-const bool easyvr::PRINT_ERROR_TRACES = true;
+const bool easyvr::SHOW_INFO_TRACES  = true;
+const bool easyvr::SHOW_DEBUG_TRACES = true;
+const bool easyvr::SHOW_ERROR_TRACES = true;
 
 void easyvr::print_info(const std::string& source, const std::string& txt)
 {
-    if(PRINT_INFO_TRACES == true) {
+    if(SHOW_INFO_TRACES == true) {
         std::cerr<<"[INFO]["<<source<<"] "<<txt<<std::endl;
     }
 }
 
 void easyvr::print_debug(const std::string& source, const std::string& txt)
 {
-    if(PRINT_DEBUG_TRACES == true) {
+    if(SHOW_DEBUG_TRACES == true) {
         std::cerr<<"[DEBUG]["<<source<<"] "<<txt<<std::endl;
     }
 }
 
 void easyvr::print_error(const std::string& source, const std::string& txt, int error_code = 0)
 {
-    if(PRINT_ERROR_TRACES == true) {
+    if(SHOW_ERROR_TRACES == true) {
         if(error_code) {
             std::cerr<<"[ERROR]["<<source<<"] "<<txt<<", code: " \
                 <<std::showbase<<std::hex<<error_code<<std::dec<<std::endl;
@@ -56,7 +57,7 @@ void easyvr::initialize_baudrate(void)
     char resp = '\0';
     static const int alt_baudrate = bd38400;
 
-    resp = transfer_data(CMD_ID, STANDARD_TIMEOUT_MS);
+    resp = transfer_data(CMD_ID, EXTENDED_TIMEOUT_MS);
     print_debug(__func__, std::string("Resp: ") + resp);
 
     if(resp == STS_ID || resp == STS_AWAKEN) {
@@ -500,7 +501,7 @@ int easyvr::handle_commands()
 
 char easyvr::transfer_data(const char req, int timeout_ms)
 {
-    return transfer_sequence(&req, 1, 100);
+    return transfer_sequence(&req, 1, timeout_ms);
 }
 
 char easyvr::transfer_sequence(const char* req, ssize_t size, int timeout_ms)

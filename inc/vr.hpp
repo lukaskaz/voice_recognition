@@ -37,9 +37,9 @@ class easyvr {
         int error;
         std::string serial;
 
-        static const bool PRINT_INFO_TRACES;
-        static const bool PRINT_DEBUG_TRACES;
-        static const bool PRINT_ERROR_TRACES;
+        static const bool SHOW_INFO_TRACES;
+        static const bool SHOW_DEBUG_TRACES;
+        static const bool SHOW_ERROR_TRACES;
         
         void initialize(void) { initialize_serial(); initialize_baudrate(); initialize_vr(); }
         void initialize_serial(void);
