@@ -13,10 +13,10 @@
 
 void signal_handler(int sig)
 {
-    std::cout<<"Restoring default baudrate!"<<std::endl;
+    std::cout<<std::endl<<std::endl<<"Restoring default baudrate!"<<std::endl;
 
-    easyvr vr;
-    vr.~easyvr();
+    //easyvr& vr = easyvr::get_instance();
+    //vr.release_vr();
 
     std::cout<<"Exitting program!"<<std::endl;
     exit(0);
@@ -61,10 +61,12 @@ static int auth_user_process(int user, Login_Process_Op_t op)
             
             get_user_name(user, user_name);
             std::string py_script("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u " + user_name + " >/dev/null &");
+            std::string lcd_program("/home/lukasz/Desktop/work/rgblcd/prog/out/lcd -u " + user_name + " >/dev/null &");
 
             //std::cerr<<py_script.c_str()<<std::endl;
             //system("python -u /home/lukasz/Desktop/work/rainbow-hat/examples/led_text.py -u lukasz &>/dev/null &");
             system(py_script.c_str());
+            system(lcd_program.c_str());
             sleep(1);
             ret = system("ps aux|grep -i led_text.py | grep -iv grep >/dev/null");
 
@@ -96,6 +98,7 @@ static int auth_user_process(int user, Login_Process_Op_t op)
         }
         case LOGIN_PROCESS_KILL:
             ret = system("pkill -2 -f led_text.py");
+            system("pkill -2 -f lcd");
             break;
         default:
             // unsupported operation, ignore
@@ -105,7 +108,8 @@ static int auth_user_process(int user, Login_Process_Op_t op)
     return ret;
 }
 
-#define IS_EXIT(state)        ((state == 0) || (state == 1))
+//#define IS_EXIT(state)        ((state == 0) || (state == 1))
+#define IS_EXIT(state)          (state == 1)
 #define IS_LOGOUT(state)        (state == 3)
 
 int main(int argc, char* argv[])
@@ -113,7 +117,7 @@ int main(int argc, char* argv[])
     signal(SIGINT, signal_handler);
     std::cout<<"Starting EasyVR control program!"<<std::endl;
 
-    easyvr vr;
+    easyvr& vr = easyvr::get_instance();
     int vr_fw_ver = (-1);
 
     if(!vr.get_fw_version(vr_fw_ver)) {
@@ -125,10 +129,28 @@ int main(int argc, char* argv[])
 
     int state = (-1);
     while(IS_EXIT(state) == 0) {
+
+	while(1) {
+		break;
+		int vol = 0, cmd = 0;
+
+		std::cout<<"Please set volume gain and command to be played: ";
+		std::cin>>vol;
+		std::cin>>cmd;
+		vr.play_voice_info(cmd, vol);
+	}
+
+
+    
         state = (-1);
 
         if(!vr.authenticate()) {
-            auth_user_process(vr.get_user_idx(), LOGIN_PROCESS_START);
+            //auth_user_process(vr.get_user_idx(), LOGIN_PROCESS_START);
+
+	    state = vr.menu();
+            if(IS_EXIT(state) != 0 || IS_LOGOUT(state) != 0) {
+		continue;
+	    }
 
             while(IS_EXIT(state) == 0 && IS_LOGOUT(state) == 0) {
                 if(!vr.handle_commands()) {
