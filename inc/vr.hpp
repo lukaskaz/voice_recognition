@@ -9,7 +9,21 @@
 #include <fcntl.h>
 #include <termios.h> 
 
+#include <unordered_map>
+#include <forward_list>
+
+#include "voice_messages.hpp"
+#include "voice_commands.hpp"
+
 #define SERIAL_NODE_NAME    "/dev/serial0"
+
+class easyvr;
+
+typedef struct {
+	int intro;
+	std::forward_list<voice_messages_t> help_infos;
+	int (easyvr::*callback)(int);
+} menu_data_t;
 
 class easyvr {
     public:
@@ -26,8 +40,6 @@ class easyvr {
         int menu(void);
         int get_menu_sel(void);
         int get_submenu_sel(void);
-
-        void release_vr(void);
 
     private:
         easyvr(): baudrate(B9600), auth_sess_nb(0), non_auth_sess_nb(0), user_idx(-1), 
@@ -47,16 +59,18 @@ class easyvr {
         std::string serial;
 
         static int volume_gain;
+	static std::unordered_map<int, menu_data_t> menus;
+	
 	static const bool SHOW_INFO_TRACES;
         static const bool SHOW_DEBUG_TRACES;
         static const bool SHOW_ERROR_TRACES;
-       
+	
         void reset(void); 	
         void initialize(void) { reset(); initialize_serial(); initialize_baudrate(); initialize_vr(); }
         void initialize_serial(void);
         void initialize_baudrate(void);
         void initialize_vr(void);
-        //void release_vr(void);
+        void release_vr(void);
 
         char transfer_sequence(const char* req, ssize_t size, int timeout_ms);
         char transfer_data(const char req, int timeout_ms);

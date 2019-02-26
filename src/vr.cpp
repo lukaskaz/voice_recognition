@@ -19,7 +19,87 @@ const bool easyvr::SHOW_INFO_TRACES  = true;
 const bool easyvr::SHOW_DEBUG_TRACES = true;
 const bool easyvr::SHOW_ERROR_TRACES = true;
 
-int easyvr::volume_gain = 4;
+
+#define VOICE_RECOG_MAIN_MENU	0xFF
+			
+int easyvr::volume_gain = 6;
+std::unordered_map<int, menu_data_t> easyvr::menus
+({
+	{
+		VOICE_RECOG_MAIN_MENU,
+                {
+	        	.intro = VOICE_MSG_MENU_MAIN,
+			.help_infos =
+			{
+				VOICE_MSG_MENU_SESSION, VOICE_MSG_MENU_INTERFACE, 
+				VOICE_MSG_MENU_SYSTEM, VOICE_MSG_MENU_VOLUME,
+				VOICE_MSG_MENU_SERVOS, VOICE_MSG_MENU_LED,
+				VOICE_MSG_MENU_SIGNAL	
+			},
+			.callback = &easyvr::submenus_dispatcher
+		}
+	},
+	{
+		VOICE_CMD_MENU_SESSION,
+                {
+	        	.intro = VOICE_MSG_MENU_SESSION,
+			.help_infos = { VOICE_MSG_LOGOUT },
+			.callback = &easyvr::submenu_session
+		}
+	},
+	{
+		VOICE_CMD_MENU_INTERFACE, 
+		{
+			.intro = VOICE_MSG_MENU_INTERFACE,
+			.help_infos = { VOICE_MSG_CLOSE },
+			.callback = &easyvr::submenu_interface
+		}
+	},
+	{
+		VOICE_CMD_MENU_SERVOS, 
+		{
+			.intro = VOICE_MSG_MENU_SERVOS,
+			.help_infos = 
+			{ 
+				VOICE_MSG_ENERGISE, VOICE_MSG_DISENGAGE, 
+				VOICE_MSG_MANUAL_CONTROL  
+			},
+			.callback = &easyvr::submenu_servos
+		}
+	},
+	{
+		VOICE_CMD_MENU_SYSTEM, 
+		{
+			.intro = VOICE_MSG_MENU_SYSTEM,
+			.help_infos = { VOICE_MSG_CLOSE },
+			.callback = &easyvr::submenu_system
+		}
+	},
+	{
+		VOICE_CMD_MENU_VOLUME, 
+		{	
+			.intro = VOICE_MSG_MENU_VOLUME,
+			.help_infos = { VOICE_MSG_DECREASE, VOICE_MSG_INCREASE },
+			.callback = &easyvr::submenu_volume
+		}
+	},
+	{
+		VOICE_CMD_MENU_LED, 
+		{
+			.intro = VOICE_MSG_MENU_LED,
+			.help_infos = { VOICE_MSG_SEL_RED, VOICE_MSG_SEL_GREEN, VOICE_MSG_SEL_BLUE },
+			.callback = &easyvr::submenu_led
+		}
+	},
+	{
+		VOICE_CMD_MENU_SIGNAL, 
+		{
+			.intro = VOICE_MSG_MENU_SIGNAL,
+			.help_infos = { VOICE_MSG_ACTIVATE_SIGNAL },
+			.callback = &easyvr::submenu_signal
+		}
+	}
+});
 
 void easyvr::print_info(const std::string& source, const std::string& txt)
 {
@@ -537,9 +617,6 @@ int easyvr::get_submenu_sel(void)
     return sel;
 }
 
-typedef int (easyvr::*submenu_handler)(int);
-#define MAX_SUBMENUS	10U
-
 int easyvr::submenu_session(int sel)
 {
 	int ret = (-1);
@@ -699,6 +776,9 @@ int easyvr::submenu_signal(int sel)
 		play_voice_info(VOICE_MSG_ACTIVATING_SIGNAL);
 
         	print_info(__func__, "Activating signal for 10 seconds");
+		system("/home/lukasz/Desktop/work/os_started_signal/buzzer_ctrl --state on");
+		sleep(10);
+		system("/home/lukasz/Desktop/work/os_started_signal/buzzer_ctrl --state off");
 	}
 	else {
 		ret = (-1);
@@ -709,65 +789,12 @@ int easyvr::submenu_signal(int sel)
 
 int easyvr::submenus_dispatcher(int idx)
 {
-	static const struct {
-		int intro;
-		int help_infos[10];
-		submenu_handler callback;
-	} menus[MAX_SUBMENUS] = 
-	{
-		[VOICE_CMD_MENU_HELP] = { 0 }, 
-		[VOICE_CMD_MENU_SESSION] = 
-		{
-			.intro = VOICE_MSG_MENU_SESSION,
-			.help_infos = { VOICE_MSG_LOGOUT, (-1) },
-			.callback = &easyvr::submenu_session
-		},
-		[VOICE_CMD_MENU_INTERFACE] = 
-		{
-			.intro = VOICE_MSG_MENU_INTERFACE,
-			.help_infos = { VOICE_MSG_CLOSE, (-1) },
-			.callback = &easyvr::submenu_interface
-		},
-		[VOICE_CMD_MENU_SERVOS] = 
-		{
-			.intro = VOICE_MSG_MENU_SERVOS,
-			.help_infos = 
-			{ 
-				VOICE_MSG_ENERGISE, VOICE_MSG_DISENGAGE, 
-				VOICE_MSG_MANUAL_CONTROL, (-1) 
-			},
-			.callback = &easyvr::submenu_servos
-		},
-		[VOICE_CMD_MENU_SYSTEM] = 
-		{
-			.intro = VOICE_MSG_MENU_SYSTEM,
-			.help_infos = { VOICE_MSG_CLOSE, (-1) },
-			.callback = &easyvr::submenu_system
-		},
-		[VOICE_CMD_MENU_VOLUME] = 
-		{
-			.intro = VOICE_MSG_MENU_VOLUME,
-			.help_infos = { VOICE_MSG_DECREASE, VOICE_MSG_INCREASE, (-1) },
-			.callback = &easyvr::submenu_volume
-		},
-		[VOICE_CMD_MENU_LED] = 
-		{
-			.intro = VOICE_MSG_MENU_LED,
-			.help_infos = { VOICE_MSG_SEL_RED, VOICE_MSG_SEL_GREEN, VOICE_MSG_SEL_BLUE, (-1) },
-			.callback = &easyvr::submenu_led
-		},
-		[VOICE_CMD_MENU_SIGNAL] = 
-		{
-			.intro = VOICE_MSG_MENU_SIGNAL,
-			.help_infos = { VOICE_MSG_ACTIVATE_SIGNAL, (-1) },
-			.callback = &easyvr::submenu_signal
-		},
-	};
 	int ret = (-1);
 
-	if(menus[idx].callback != NULL) {
+	std::unordered_map<int, menu_data_t>::const_iterator submenu = menus.find(idx);
+	if(submenu != menus.end()) {
 		play_voice_info(VOICE_MSG_PRESENT_MENU);
-		play_voice_info(menus[idx].intro);
+		play_voice_info(submenu->second.intro);
 		
 		while(1) {
 			play_voice_info(VOICE_MSG_GIVE_CMD_OR_HELP);
@@ -776,22 +803,18 @@ int easyvr::submenus_dispatcher(int idx)
 			if(sel == VOICE_CMD_MENU_SEL_HELP) {
 				play_voice_info(VOICE_MSG_AVAIL_COMMANDS);
 
-				for(unsigned int i = 0; i < sizeof(menus[idx].help_infos)/sizeof(menus[idx].help_infos[0]); i++)
-				{
-					if(menus[idx].help_infos[i] == (-1)) {
-						break;
-					}
-					play_voice_info(menus[idx].help_infos[i]);
+				for(const voice_messages_t &help_info : submenu->second.help_infos) {
+					play_voice_info(help_info);
 				}
 
 				play_voice_info(VOICE_MSG_EXIT_MENU);
 			}
 			else if(sel == VOICE_CMD_MENU_SEL_EXIT_MENU) {
-				(this->*menus[idx].callback)(sel);
+				(this->*submenu->second.callback)(sel);
 				break;
 			}
 			else {
-				ret = (this->*menus[idx].callback)(sel);
+				ret = (this->*submenu->second.callback)(sel);
 				if(ret > 0) {
 					break;
 				}
@@ -808,31 +831,32 @@ int easyvr::menu(void)
 {
 	int ret = (-1);
 
-	while(1) {
-		play_voice_info(VOICE_MSG_PRESENT_MENU);
-		play_voice_info(VOICE_MSG_MENU_MAIN);
-		play_voice_info(VOICE_MSG_GIVE_CMD_OR_HELP);
-
-	    	set_timeout(10);
+	std::unordered_map<int, menu_data_t>::const_iterator mainmenu = menus.find(VOICE_RECOG_MAIN_MENU);
+	if(mainmenu != menus.end()) {
+	    	set_timeout(25);
     		set_sd_sensitive(3);
 	
-		int sel = get_menu_sel();
-		if(sel == VOICE_CMD_MENU_HELP) {
-			play_voice_info(VOICE_MSG_AVAIL_COMMANDS);
+		while(1) {
+			play_voice_info(VOICE_MSG_PRESENT_MENU);
+			play_voice_info(mainmenu->second.intro);
+			play_voice_info(VOICE_MSG_GIVE_CMD_OR_HELP);
 
-			play_voice_info(VOICE_MSG_MENU_SESSION);
-			play_voice_info(VOICE_MSG_MENU_INTERFACE);
-			play_voice_info(VOICE_MSG_MENU_SYSTEM);
-			play_voice_info(VOICE_MSG_MENU_VOLUME);
-			play_voice_info(VOICE_MSG_MENU_SERVOS);
-			play_voice_info(VOICE_MSG_MENU_LED);
-			play_voice_info(VOICE_MSG_MENU_SIGNAL);
-		}
-		else {
-			ret = submenus_dispatcher(sel);
-			if(ret > 0) {
-				break;
+			int sel = get_menu_sel();
+			if(sel == VOICE_CMD_MENU_HELP) {
+				play_voice_info(VOICE_MSG_AVAIL_COMMANDS);
+
+				for(const voice_messages_t &help_info : mainmenu->second.help_infos) {
+					play_voice_info(help_info);
+				}
 			}
+			else {
+				ret = (this->*mainmenu->second.callback)(sel);
+				if(ret > 0) {
+					break;
+				}
+			}
+			
+			usleep(250*1000);
 		}
 	}
 
