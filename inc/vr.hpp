@@ -20,7 +20,9 @@
 class easyvr;
 
 typedef struct {
+	int level;
 	int intro;
+	bool intro_in_loop;
 	std::forward_list<voice_messages_t> help_infos;
 	int (easyvr::*callback)(int);
 } menu_data_t;
