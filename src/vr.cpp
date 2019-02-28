@@ -36,7 +36,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
                 {
 			.level = MENU_LVL_MAIN,
 	        	.intro = VOICE_MSG_MENU_MAIN,
-	        	.intro_in_loop = true,
+	        	.intro_repeat = true,
 			.help_infos =
 			{
 				VOICE_MSG_MENU_SESSION, VOICE_MSG_MENU_INTERFACE, 
@@ -52,7 +52,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
                 {
 			.level = MENU_LVL_SUB,
 	        	.intro = VOICE_MSG_MENU_SESSION,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = { VOICE_MSG_LOGOUT, VOICE_MSG_EXIT_MENU },
 			.callback = &easyvr::submenu_session
 		}
@@ -62,7 +62,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_INTERFACE,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = { VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU },
 			.callback = &easyvr::submenu_interface
 		}
@@ -72,7 +72,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_SERVOS,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = 
 			{ 
 				VOICE_MSG_ENERGISE, VOICE_MSG_DISENGAGE, 
@@ -86,7 +86,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_SYSTEM,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = { VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU },
 			.callback = &easyvr::submenu_system
 		}
@@ -96,7 +96,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{	
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_VOLUME,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = { VOICE_MSG_DECREASE, VOICE_MSG_INCREASE, VOICE_MSG_EXIT_MENU },
 			.callback = &easyvr::submenu_volume
 		}
@@ -106,7 +106,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_LED,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos =
 			{
 				VOICE_MSG_SEL_RED, VOICE_MSG_SEL_GREEN,
@@ -120,7 +120,7 @@ std::unordered_map<int, menu_data_t> easyvr::menus
 		{
 			.level = MENU_LVL_SUB,
 			.intro = VOICE_MSG_MENU_SIGNAL,
-	        	.intro_in_loop = false,
+	        	.intro_repeat = false,
 			.help_infos = { VOICE_MSG_ACTIVATE_SIGNAL, VOICE_MSG_EXIT_MENU },
 			.callback = &easyvr::submenu_signal
 		}
@@ -816,29 +816,24 @@ int easyvr::submenu_signal(int sel)
 int easyvr::submenus_dispatcher(int idx)
 {
 	int ret = (-1);
+	int menu_prompt_delay_ms = 250;
 
 	std::unordered_map<int, menu_data_t>::const_iterator menu = menus.find(idx);
 	if(menu != menus.end()) {
-		if(menu->second.intro_in_loop == false) {
-			play_voice_info(VOICE_MSG_PRESENT_MENU);
-			play_voice_info(menu->second.intro);
-		}
+		play_voice_info(VOICE_MSG_PRESENT_MENU);
+		play_voice_info(menu->second.intro);
 
 		while(1) {
-			if(menu->second.intro_in_loop == true) {
-				play_voice_info(VOICE_MSG_PRESENT_MENU);
-				play_voice_info(menu->second.intro);
-			}
-	
 			play_voice_info(VOICE_MSG_GIVE_CMD_OR_HELP);
+			
 			int sel = (menu->second.level == MENU_LVL_MAIN) ? get_menu_sel() : get_submenu_sel();
-		
 			if(sel == VOICE_CMD_MENU_SEL_HELP) {
 				play_voice_info(VOICE_MSG_AVAIL_COMMANDS);
-
 				for(const voice_messages_t &help_info : menu->second.help_infos) {
 					play_voice_info(help_info);
 				}
+
+				continue;
 			}
 			else if(sel == VOICE_CMD_MENU_SEL_EXIT_MENU) {
 				(this->*menu->second.callback)(sel);
@@ -851,7 +846,12 @@ int easyvr::submenus_dispatcher(int idx)
 				}
 			}
 
-			usleep(250*1000);
+			usleep(menu_prompt_delay_ms*1000);
+			
+			if(menu->second.intro_repeat == true) {
+				play_voice_info(VOICE_MSG_PRESENT_MENU);
+				play_voice_info(menu->second.intro);
+			}
 		}
 	}
 
