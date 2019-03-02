@@ -2,7 +2,7 @@
 #include <string>
 #include <stdio.h>
 #include <poll.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <termios.h> 
 

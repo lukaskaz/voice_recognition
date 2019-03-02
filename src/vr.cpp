@@ -29,102 +29,84 @@ typedef enum {
 
 
 int easyvr::volume_gain = 6;
-std::unordered_map<int, menu_data_t> easyvr::menus
+const std::unordered_map<int, menu_data> easyvr::menus
 ({
-	{
-		VOICE_RECOG_MAIN_MENU,
-                {
-			.level = MENU_LVL_MAIN,
-	        	.intro = VOICE_MSG_MENU_MAIN,
-	        	.intro_repeat = true,
-			.help_infos =
-			{
-				VOICE_MSG_MENU_SESSION, VOICE_MSG_MENU_INTERFACE, 
-				VOICE_MSG_MENU_SYSTEM, VOICE_MSG_MENU_VOLUME,
-				VOICE_MSG_MENU_SERVOS, VOICE_MSG_MENU_LED,
-				VOICE_MSG_MENU_SIGNAL	
-			},
-			.callback = &easyvr::submenus_dispatcher
-		}
-	},
-	{
-		VOICE_CMD_MENU_SESSION,
-                {
-			.level = MENU_LVL_SUB,
-	        	.intro = VOICE_MSG_MENU_SESSION,
-	        	.intro_repeat = false,
-			.help_infos = { VOICE_MSG_LOGOUT, VOICE_MSG_EXIT_MENU },
-			.callback = &easyvr::submenu_session
-		}
-	},
-	{
-		VOICE_CMD_MENU_INTERFACE, 
-		{
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_INTERFACE,
-	        	.intro_repeat = false,
-			.help_infos = { VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU },
-			.callback = &easyvr::submenu_interface
-		}
-	},
-	{
-		VOICE_CMD_MENU_SERVOS, 
-		{
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_SERVOS,
-	        	.intro_repeat = false,
-			.help_infos = 
-			{ 
-				VOICE_MSG_ENERGISE, VOICE_MSG_DISENGAGE, 
-				VOICE_MSG_MANUAL_CONTROL, VOICE_MSG_EXIT_MENU
-			},
-			.callback = &easyvr::submenu_servos
-		}
-	},
-	{
-		VOICE_CMD_MENU_SYSTEM, 
-		{
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_SYSTEM,
-	        	.intro_repeat = false,
-			.help_infos = { VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU },
-			.callback = &easyvr::submenu_system
-		}
-	},
-	{
-		VOICE_CMD_MENU_VOLUME, 
-		{	
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_VOLUME,
-	        	.intro_repeat = false,
-			.help_infos = { VOICE_MSG_DECREASE, VOICE_MSG_INCREASE, VOICE_MSG_EXIT_MENU },
-			.callback = &easyvr::submenu_volume
-		}
-	},
-	{
-		VOICE_CMD_MENU_LED, 
-		{
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_LED,
-	        	.intro_repeat = false,
-			.help_infos =
-			{
-				VOICE_MSG_SEL_RED, VOICE_MSG_SEL_GREEN,
-				VOICE_MSG_SEL_BLUE, VOICE_MSG_EXIT_MENU
-			},
-			.callback = &easyvr::submenu_led
-		}
-	},
-	{
-		VOICE_CMD_MENU_SIGNAL, 
-		{
-			.level = MENU_LVL_SUB,
-			.intro = VOICE_MSG_MENU_SIGNAL,
-	        	.intro_repeat = false,
-			.help_infos = { VOICE_MSG_ACTIVATE_SIGNAL, VOICE_MSG_EXIT_MENU },
-			.callback = &easyvr::submenu_signal
-		}
-	}
+    {
+        VOICE_RECOG_MAIN_MENU,
+        menu_data(
+            MENU_LVL_MAIN, VOICE_MSG_MENU_MAIN, true, &easyvr::submenus_dispatcher,
+            {
+                VOICE_MSG_MENU_SESSION, VOICE_MSG_MENU_INTERFACE, VOICE_MSG_MENU_SYSTEM,
+                VOICE_MSG_MENU_VOLUME, VOICE_MSG_MENU_SERVOS, VOICE_MSG_MENU_LED,
+                VOICE_MSG_MENU_SIGNAL
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_SESSION,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_SESSION, false, &easyvr::submenu_session,
+            {
+                VOICE_MSG_LOGOUT, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_INTERFACE,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_INTERFACE, false, &easyvr::submenu_interface,
+            {
+                VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_SERVOS,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_SERVOS, false, &easyvr::submenu_servos,
+            {
+                VOICE_MSG_ENERGISE, VOICE_MSG_DISENGAGE,
+                VOICE_MSG_MANUAL_CONTROL, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_SYSTEM,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_SYSTEM, false, &easyvr::submenu_system,
+            {
+                VOICE_MSG_CLOSE, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_VOLUME,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_VOLUME, false, &easyvr::submenu_volume,
+            {
+                VOICE_MSG_DECREASE, VOICE_MSG_INCREASE, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_LED,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_LED, false, &easyvr::submenu_led,
+            {
+                VOICE_MSG_SEL_RED, VOICE_MSG_SEL_GREEN,
+                VOICE_MSG_SEL_BLUE, VOICE_MSG_EXIT_MENU
+            }
+        )
+    },
+    {
+        VOICE_CMD_MENU_SIGNAL,
+        menu_data(
+            MENU_LVL_SUB, VOICE_MSG_MENU_SIGNAL, false, &easyvr::submenu_signal,
+            {
+                VOICE_MSG_ACTIVATE_SIGNAL, VOICE_MSG_EXIT_MENU
+            }
+        )
+    }
 });
 
 void easyvr::print_info(const std::string& source, const std::string& txt)
@@ -208,7 +190,7 @@ void easyvr::initialize_baudrate(void)
     }
 }
 
-void easyvr::initialize_vr(void)
+void easyvr::recover_vr(void)
 {
     char resp = '\0';
 
@@ -230,6 +212,7 @@ void easyvr::release_vr(void)
 void easyvr::error_handler(char resp)
 {
     int err_code = (-1);
+    int info = (-1);
 
     if(resp == STS_ERROR) {
         err_code = get_argument();
@@ -239,9 +222,20 @@ void easyvr::error_handler(char resp)
         }
 
         print_error(__func__, "Error detected", err_code);
+        if(err_code == ERR_RECOG_FAIL) {
+            info = VOICE_MSG_NOT_UNDERSTAND;
+        }
+    }
+    else {
+        if(resp == STS_TIMEOUT) {
+            info = VOICE_MSG_TIMEOUT;
+        }
     }
 
-    initialize_vr();
+    recover_vr();
+    if(info != (-1)) {
+        play_voice_info(info);
+    }
 }
 
 int easyvr::get_baudrate(int baud_id)
@@ -818,7 +812,7 @@ int easyvr::submenus_dispatcher(int idx)
 	int ret = (-1);
 	int menu_prompt_delay_ms = 250;
 
-	std::unordered_map<int, menu_data_t>::const_iterator menu = menus.find(idx);
+	std::unordered_map<int, menu_data>::const_iterator menu = menus.find(idx);
 	if(menu != menus.end()) {
 		play_voice_info(VOICE_MSG_PRESENT_MENU);
 		play_voice_info(menu->second.intro);
@@ -860,7 +854,9 @@ int easyvr::submenus_dispatcher(int idx)
 
 int easyvr::menu(void)
 {
-	return submenus_dispatcher(VOICE_RECOG_MAIN_MENU);
+    set_timeout(20);
+    set_sd_sensitive(3);
+    return submenus_dispatcher(VOICE_RECOG_MAIN_MENU);
 }
 
 int easyvr::authenticate(void)

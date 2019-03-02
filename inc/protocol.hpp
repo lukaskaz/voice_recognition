@@ -68,26 +68,21 @@
 #define STS_TOKEN       'f' // received sonicnet token <1-2>
 #define STS_MESSAGE     'g' // message status <1> (0=empty, 4/8=bits format), length <2-7>
 
+// error codes
+#define ERR_SPEAK_NOISY     0x03
+#define ERR_SPEAK_SOFT      0x04
+#define ERR_SPEAK_LOUD      0x05
+#define ERR_SPEAK_SOON      0x06
+#define ERR_SPEAK_CHOPPY    0x07
+#define ERR_RECOG_FAIL      0x11
+#define ERR_RECOG_LOW       0x12
+#define ERR_RECOG_MID       0x13
+
 // protocol arguments are in the range 0x40 (-1) to 0x60 (+31) inclusive
 #define ARG_MIN     0x40
 #define ARG_MAX     0x60
 #define ARG_ZERO    0x41
 
 #define ARG_ACK     0x20    // to read more status arguments
-
-#define SND_01_Witaj_uzytkowniku 1
-#define SND_02_Podaj_imie       2
-#define SND_03_Milo_widziec     3
-#define SND_04_Podaj_haslo      4
-#define SND_05_Po_sygnale       5
-#define SND_06_Dostep_przyznany 6
-#define SND_07_Nie_znam_powtorz 7
-#define SND_08_Nie_rozpoznane_powtorz 8
-#define SND_09_Odmowa_dostepu   9
-#define SND_10_Nie_zidentyfikowany_przerywam 10
-#define SND_11_Lukasz           11
-#define SND_12_Renata           12
-#define SND_13_Adela            13
-#define SND_14_Jerzy            14
 
 #endif //PROTOCOL_H
